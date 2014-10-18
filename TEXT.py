@@ -7,12 +7,82 @@
 # ====== #
 import os
 import string
+import numpy as np
 
 # ==================== #
 # functions definition #
 # ==================== #
 
+def PREPROCESS_DICT( dictionaryFileNameStr ) :
+	outputTextFileNameStr = dictionaryFileNameStr + ".np"
+	# ----------------------- #
+	# check file availability #
+	# ----------------------- #
+	if not os.path.isfile(  dictionaryFileNameStr ) :
+	        print "Error @ TEXT.PREPROCESS_DICT() :"
+	        print dictionaryFileNameStr  + " is not found !"
+	        print "Error exit."
+	        return
+	if     os.path.isfile( outputTextFileNameStr ) :
+	        print "Error @ TEXT.PREPROCESS_DICT() :"
+	        print outputTextFileNameStr + " already exists !"
+	        print "Do you want to overwrite it ? [ y / n ]"
+	        userReply = raw_input()
+	        if userReply == 'n' :
+	                return
+	        else :
+	                os.remove( outputTextFileNameStr )
+	# -------------------- #
+	# read dictionary file #
+	# -------------------- #
+	fileObject = open( dictionaryFileNameStr , 'r' )
+	dictLines  = fileObject.readlines()
+	fileObject.close()
+	# ----------------------------------- #
+	# punctuation and white space removal #
+	# ----------------------------------- #
+	for k in range( 0 , len( dictLines ) ) :
+		dictLines[k] = dictLines[k].replace('.','')
+		dictLines[k] = dictLines[k].replace(',','')
+		dictLines[k] = dictLines[k].replace('/','')
+		dictLines[k] = dictLines[k].replace('-','')
+		dictLines[k] = dictLines[k].replace('_','')
+		dictLines[k] = dictLines[k].replace('\'','')
+		dictLines[k] = dictLines[k].replace('\"','')
+		dictLines[k] = dictLines[k].replace('`','')
+		dictLines[k] = dictLines[k].replace('&','')
+		dictLines[k] = dictLines[k].replace(' ','')
+		dictLines[k] = dictLines[k].replace('(','')
+		dictLines[k] = dictLines[k].replace(')','')
+	# -------------------------- #
+	# remove duplicates and sort #
+	# -------------------------- #
+	dictLines  = list( set( dictLines ) )
+	dictLines.sort()
+	# -------------- #
+	# export to file #
+	# -------------- #
+	fileObject = open( outputTextFileNameStr , 'w' )
+	for k in range( 0 , len( dictLines ) ) :
+		fileObject.write( dictLines[k] )
+	fileObject.close()
+	# ------ #
+	# finish #
+	# ------ #
+	return
+
 def PREPROCESS( inputTextFileNameStr ) :
+	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+	# this function generates 2 files                 #
+	# one is a file with vectorized content           #
+	# and whereas no punctuations exist               #
+	# the file name is <inputTextFileNameStr>.np      #
+	#                                                 #
+	# one is a sorted version of the above            #
+	# file with all contents casted to lower case     #
+	# the file name is <inputTextFileNameStr>.np.sort #
+	#                                                 #
+	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 	# ============================================ #
 	# Part I : punctuation removal & vectorization #
 	# ============================================ #
@@ -43,7 +113,7 @@ def PREPROCESS( inputTextFileNameStr ) :
         # ------------------- #
         # punctuation removal #
         # ------------------- #
-        strTransLogic = ''.join( chr(c) if chr(c).isupper() or chr(c).islower() else '\n' for c in range(256) )
+        strTransLogic = ''.join( chr(c)  if chr(c).isupper() or chr(c).islower() else '\n' for c in range(256) )
         outputStr     = inputStr.translate( strTransLogic )
         outputStr     = outputStr.lower()
 	# ---------------------------- #
@@ -55,6 +125,9 @@ def PREPROCESS( inputTextFileNameStr ) :
 	# ======================================================== #
 	# Part II : sort the vectorized punctuation-free text file #
 	# ======================================================== #
+	# --------------------------------- #
+	# update the input output file name #
+	# --------------------------------- #
 	inputTextFileNameStr  = outputTextFileNameStr
 	outputTextFileNameStr =  inputTextFileNameStr + '.sort'
         # ----------------------- #
@@ -97,6 +170,106 @@ def PREPROCESS( inputTextFileNameStr ) :
 	# finish #
 	# ====== #
 	return outputTextFileNameStr
+
+
+def FORMVECTOR( inputTextFileNameStr , dictioaryFileNameStr ) :
+	# =============================================================== #
+	# this function generates a vector file and return a vector       #
+	# the vector file named <inputTextFileNameStr>.vec contains       #
+	# a column vector indicating the frequency of occurance of        #
+	# every existing words in the passage.                            #
+	# these words correspond to the index from the dictionary.np.sort #
+	# meanwhile, the column vector of type numpy array is returned    #
+	# =============================================================== #
+	outputTextFileNameStr = inputTextFileNameStr + ".vec"
+	# ----------------------- #
+	# check file availability #
+	# ----------------------- #
+	if not os.path.isfile(  inputTextFileNameStr ) :
+		print "Error @ TEXT.FORMVECTOR() :"
+		print inputTextFileNameStr  + " is not found !"
+		print "Error exit."
+		return
+	if     os.path.isfile( outputTextFileNameStr ) :
+		print "Error @ TEXT.FORMVECTOR() :"
+		print outputTextFileNameStr + " already exists !"
+		print "Do you want to overwrite it ? [ y / n ]"
+		userReply = raw_input()
+		if userReply == 'n' :
+			return
+		else :
+			os.remove( outputTextFileNameStr )
+	# ======================================= #
+	# Part I : read input file and dictionary #
+	# ======================================= #
+	fileObject          = open( inputTextFileNameStr , 'r' )
+	inputFileLines      = fileObject.readlines()
+	fileObject.close()
+	fileObject          = open( dictioaryFileNameStr , 'r' )
+	dictLines           = fileObject.readlines()
+	fileObject.close()
+	# ======================= #
+	# Part II : create vector #
+	# ======================= #
+	vector = np.zeros( len( dictLines ) )
+	Idx_inputFile = 0  # index for input file transversal
+	Idx_dict      = 0  # index for dictionary transversal
+	inputFileSize = len( inputFileLines )
+	dictSize      = len( dictLines )
+	wordNotFound  = False # for handling words from input text not found from dictionary
+	print "inputFileSize = %d" %(inputFileSize)
+	print "dictSize      = %d" %(dictSize)
+	print ""
+	while Idx_inputFile < inputFileSize :
+		print "status: %d / %d" %(Idx_inputFile,inputFileSize)
+		#print "@ position 1"
+		#print "Idx_inputFile = %d" %(Idx_inputFile)
+		#print "Idx_dict      = %d" %(Idx_dict)
+		#print ""
+		backup_Idx_inputFile = Idx_inputFile # backup . used to restore index position
+		backup_Idx_dict      = Idx_dict      # when the word is not found from dictionary
+		while inputFileLines[ Idx_inputFile ] != dictLines[ Idx_dict ] :
+			#print "@ position 2"
+			#print "Idx_inputFile = %d" %(Idx_inputFile)
+                        #print "Idx_dict      = %d" %(Idx_dict)
+			#print ""
+			if Idx_dict + 1 < dictSize :
+				Idx_dict   += 1
+			else :
+				wordNotFound = True
+				print "Word Is Unfound From Dictionary !!!"
+				print ""
+				break # exit from looping dictionary process
+		if wordNotFound :
+			Idx_dict      = backup_Idx_dict
+			Idx_inputFile = backup_Idx_inputFile + 1
+			wordNotFound  = False # reset back to default value
+			#print "@ position 3"
+			#print "Idx_inputFile = %d" %(Idx_inputFile)
+			#print "Idx_dict      = %d" %(Idx_dict)
+			#print ""
+			continue # exit from matching word obtained from input tex
+			         # and continue to match the next word
+		else :
+			vector[ Idx_dict ] += 1
+			Idx_inputFile      += 1
+			#print "vector updated !!!"
+			#print ""
+			while Idx_inputFile < inputFileSize and inputFileLines[ Idx_inputFile ] == inputFileLines[ Idx_inputFile - 1 ] :
+				# check if the index is not out of bound
+				# and check if the word is the same as the previous one.
+				vector[ Idx_dict ] += 1
+				Idx_inputFile      += 1
+				#print "vector updated !!!"
+				#print ""
+	# ================================ #
+	# Part III : export vector to file #
+	# ================================ #
+	fileObject = open( outputTextFileNameStr , 'w' )
+	for k in range( 0 , vector.size ) :
+		fileObject.write( "%d\n" %(vector[k]) )
+	fileObject.close()
+	return vector
 
 
 def WORD2NUM( inputTextFileNameStr ) :
