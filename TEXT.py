@@ -172,7 +172,7 @@ def PREPROCESS( inputTextFileNameStr ) :
 	return outputTextFileNameStr
 
 
-def FORMVECTOR( inputTextFileNameStr , dictioaryFileNameStr ) :
+def FORMVECTOR( inputTextFileNameStr , dictionaryFileNameStr ) :
 	# =============================================================== #
 	# this function generates a vector file and return a vector       #
 	# the vector file named <inputTextFileNameStr>.vec contains       #
@@ -205,7 +205,7 @@ def FORMVECTOR( inputTextFileNameStr , dictioaryFileNameStr ) :
 	fileObject          = open( inputTextFileNameStr , 'r' )
 	inputFileLines      = fileObject.readlines()
 	fileObject.close()
-	fileObject          = open( dictioaryFileNameStr , 'r' )
+	fileObject          = open( dictionaryFileNameStr , 'r' )
 	dictLines           = fileObject.readlines()
 	fileObject.close()
 	# ======================= #
@@ -221,7 +221,7 @@ def FORMVECTOR( inputTextFileNameStr , dictioaryFileNameStr ) :
 	print "dictSize      = %d" %(dictSize)
 	print ""
 	while Idx_inputFile < inputFileSize :
-		print "status: %d / %d" %(Idx_inputFile,inputFileSize)
+		#print "status: %d / %d" %(Idx_inputFile,inputFileSize)
 		#print "@ position 1"
 		#print "Idx_inputFile = %d" %(Idx_inputFile)
 		#print "Idx_dict      = %d" %(Idx_dict)
@@ -237,8 +237,8 @@ def FORMVECTOR( inputTextFileNameStr , dictioaryFileNameStr ) :
 				Idx_dict   += 1
 			else :
 				wordNotFound = True
-				print "Word Is Unfound From Dictionary !!!"
-				print ""
+				#print "Word Is Unfound From Dictionary !!!"
+				#print ""
 				break # exit from looping dictionary process
 		if wordNotFound :
 			Idx_dict      = backup_Idx_dict
@@ -270,6 +270,89 @@ def FORMVECTOR( inputTextFileNameStr , dictioaryFileNameStr ) :
 		fileObject.write( "%d\n" %(vector[k]) )
 	fileObject.close()
 	return vector
+
+
+def FORMSPARSEVECTOR( inputTextFileNameStr , dictionaryFileNameStr ) :
+	outputTextFileNameStr = inputTextFileNameStr + ".sparsevec"
+	# ----------------------- #
+	# check file availability #
+	# ----------------------- #
+	if not os.path.isfile(  inputTextFileNameStr ) :
+		print "Error @ TEXT.FORMVECTOR() :"
+		print inputTextFileNameStr  + " is not found !"
+		print "Error exit."
+		return
+	if     os.path.isfile( outputTextFileNameStr ) :
+		print "Error @ TEXT.FORMVECTOR() :"
+		print outputTextFileNameStr + " already exists !"
+		print "Do you want to overwrite it ? [ y / n ]"
+		userReply = raw_input()
+		if userReply == 'n' :
+			return
+		else :
+			os.remove( outputTextFileNameStr )
+	# ======================================= #
+	# Part I : read input file and dictionary #
+	# ======================================= #
+	fileObject          = open( inputTextFileNameStr , 'r' )
+	inputFileLines      = fileObject.readlines()
+	fileObject.close()
+	fileObject          = open( dictionaryFileNameStr , 'r' )
+	dictLines           = fileObject.readlines()
+	fileObject.close()
+	# ============================== #
+	# Part II : create sparse vector #
+	# ============================== #
+	sparsevec = np.zeros( [ len( inputFileLines ) , 2 ] ) # maximum length of sparse vector file is <= the total word number of the file
+	Idx_sparsevec = 0  # index for sparse vector value assignment
+	Idx_inputFile = 0  # index for input file transversal
+	Idx_dict      = 0  # index for dictionary transversal
+	inputFileSize = len( inputFileLines )
+	dictSize      = len( dictLines )
+	wordNotFound  = False # for handling words from input text not found from dictionary
+        print "inputFileSize = %d" %(inputFileSize)
+        print "dictSize      = %d" %(dictSize)
+        print ""
+        while Idx_inputFile < inputFileSize :
+		backup_Idx_inputFile = Idx_inputFile # backup . used to restore index position   	
+        	backup_Idx_dict      = Idx_dict      # when the word is not found from dictionary
+        	while inputFileLines[ Idx_inputFile ] != dictLines[ Idx_dict ] :
+        		if Idx_dict + 1 < dictSize :
+        			Idx_dict   += 1
+        		else :
+        			wordNotFound = True
+        			break # exit from looping dictionary process
+		if wordNotFound :
+			Idx_dict      = backup_Idx_dict
+			Idx_inputFile = backup_Idx_inputFile + 1
+			wordNotFound  = False # reset back to default value
+			continue # exit from matching word obtained from input tex
+			         # and continue to match the next word
+		else :
+			sparsevec[ Idx_sparsevec , 0 ]  = Idx_dict
+			sparsevec[ Idx_sparsevec , 1 ] += 1
+			Idx_inputFile      += 1
+			while Idx_inputFile < inputFileSize and inputFileLines[ Idx_inputFile ] == inputFileLines[ Idx_inputFile - 1 ] :
+				# check if the index is not out of bound
+				# and check if the word is the same as the previous one.
+				sparsevec[ Idx_sparsevec , 1 ] += 1
+				Idx_inputFile      += 1
+			Idx_sparsevec      += 1
+		# ========================================== #
+		# end of looping the file and the dictionary #
+		# ========================================== #
+	# ========================================================== #
+	# trancate the unnecessary (all-zeros) part of sparse vector #
+	# ========================================================== #
+	sparsevec = sparsevec[ 0 : Idx_sparsevec , : ]
+	# ======================================= #
+	# Part III : export sparse vector to file #
+	# ======================================= #
+	fileObject = open( outputTextFileNameStr , 'w' )
+        for k in range( 0 , sparsevec.shape[0] ) :
+        	fileObject.write( "%d %d\n" %(sparsevec[k,0],sparsevec[k,1]) )
+        fileObject.close()
+        return sparsevec
 
 
 def WORD2NUM( inputTextFileNameStr ) :
